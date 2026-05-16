@@ -46,7 +46,7 @@ class AuthService:
             self,
             user_id: str,
             session_id: str | None = None,
-    ) -> TokenResponse:
+    ) -> tuple[TokenResponse, str]:
         """Create access/refresh token pair and save refresh token to Redis.
 
         If session_id is not provided, a new one is generated (register/login).
@@ -68,9 +68,9 @@ class AuthService:
             access_token=access_token,
             token_type='Bearer',
             expires_in=ACCESS_EXPIRE,
-        )
+        ), refresh_token
 
-    async def register(self, data: RegisterRequest) -> TokenResponse:
+    async def register(self, data: RegisterRequest) -> tuple[TokenResponse, str]:
         """Register a new user and return token pair.
 
         Raises UserAlreadyExistsError if username or email is already taken.
@@ -94,7 +94,7 @@ class AuthService:
         )
         return await self._issue_tokens(user.id)
 
-    async def login(self, data: LoginRequest) -> TokenResponse:
+    async def login(self, data: LoginRequest) -> tuple[TokenResponse, str]:
         """Authenticate user and return token pair.
 
         Always raises the same error for wrong username or password
@@ -112,7 +112,7 @@ class AuthService:
     async def refresh(
             self,
             refresh_token: str,
-    ) -> TokenResponse:
+    ) -> tuple[TokenResponse, str]:
         """Rotate refresh token and issue new access token.
 
         Validates token signature first, then checks Redis to ensure
