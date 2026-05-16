@@ -1,9 +1,10 @@
+# app/core/security.py
 from datetime import datetime, timedelta, timezone
 
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 
-from app.schemas.auth import TokenPayload
+from app.schemas.auth_schemas import TokenPayload
 from app.core.exceptions import InvalidTokenError
 from app.core.config import settings
 

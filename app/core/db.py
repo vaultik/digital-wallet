@@ -34,7 +34,7 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def get_redis() -> AsyncGenerator[Redis, None]:
-    async with Redis.from_url(settings.redis_url) as redis:
+    async with Redis.from_url(settings.redis_url, decode_responses=True) as redis:
         try:
             yield redis
         except RedisError as e:

@@ -1,3 +1,4 @@
+# app/schemas/auth_schemas.py
 from typing import Literal
 
 from pydantic import BaseModel, EmailStr, field_validator

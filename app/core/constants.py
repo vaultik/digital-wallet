@@ -20,3 +20,7 @@ FIAT_PRECISION: int = 18
 FIAT_SCALE: int = 2
 CRYPTO_PRECISION: int = 36
 CRYPTO_SCALE: int = 18
+
+# JWT expires
+ACCESS_EXPIRE: int = 60 * 15
+REFRESH_EXPIRE: int = 60 * 60 * 24 * 7
