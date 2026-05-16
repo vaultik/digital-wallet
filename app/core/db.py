@@ -2,6 +2,8 @@
 import logging
 from typing import AsyncGenerator
 
+from redis.asyncio import Redis
+from redis.exceptions import RedisError
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -29,3 +31,14 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
              raise
          finally:
              await async_session.close()
+
+
+async def get_redis() -> AsyncGenerator[Redis, None]:
+    async with Redis.from_url(settings.redis_url) as redis:
+        try:
+            yield redis
+        except RedisError as e:
+            logger.error('Redis Error: %s', e, exc_info=True)
+            raise
+        finally:
+            await redis.aclose()
