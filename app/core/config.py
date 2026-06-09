@@ -37,5 +37,8 @@ class Settings(BaseSettings):
     # Superuser
     redis_url: str = 'redis://localhost:6379'
 
+    # Tests
+    testing: bool = False
+
 
 settings = Settings()

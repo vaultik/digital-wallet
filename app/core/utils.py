@@ -1,6 +1,7 @@
 # app/core/utils.py
 from fastapi import Response
 
+from app.core.config import settings
 from app.core.constants import (
     REFRESH_EXPIRE,
 )
@@ -12,7 +13,7 @@ def set_refresh_cookie(response: Response, token: str) -> None:
         key='refresh_token',
         value=token,
         httponly=True,
-        secure=True,
+        secure=not settings.testing,
         samesite='lax',
         max_age=REFRESH_EXPIRE
     )
