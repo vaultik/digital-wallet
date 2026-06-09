@@ -26,8 +26,8 @@ def _create_token(
 ) -> str:
     try:
         payload = {
-            'sub': user_id,
-            'sid': session_id,
+            'sub': str(user_id),
+            'sid': str(session_id),
             'exp': datetime.now(timezone.utc) + expire_delta,
             'iat': datetime.now(timezone.utc)
         }

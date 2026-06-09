@@ -1,5 +1,5 @@
 # app/api/v1/auth_api.py
-from fastapi import APIRouter, Cookie, Response
+from fastapi import APIRouter, Cookie, HTTPException, Response
 from fastapi.params import Depends
 
 from app.api.dependencies import get_auth_service
@@ -63,6 +63,8 @@ async def refresh(
         service: AuthService = Depends(get_auth_service)
 ) -> TokenResponse:
     """Issue new token pair using refresh token from cookie."""
+    if refresh_token is None:
+        raise HTTPException(status_code=401, detail='Refresh token missing')
     token_response, refresh_token = await service.refresh(refresh_token)
     set_refresh_cookie(response, refresh_token)
     return token_response
@@ -79,5 +81,12 @@ async def logout(
         service: AuthService = Depends(get_auth_service)
 ) -> None:
     """Revoke refresh token and clear cookie."""
+    if refresh_token is None:
+        raise HTTPException(status_code=401, detail='Refresh token missing')
     await service.logout(refresh_token)
-    response.delete_cookie(key='refresh_token')
+    response.delete_cookie(
+        key='refresh_token',
+        httponly=True,
+        secure=True,
+        samesite='lax'
+    )
