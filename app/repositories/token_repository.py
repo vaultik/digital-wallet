@@ -6,6 +6,7 @@ from app.core.db import get_redis
 
 
 class TokenRepository:
+    """Handles all Redis operations for refresh token management."""
 
     def __init__(self, redis: Redis = Depends(get_redis)):
         self._redis = redis
@@ -45,6 +46,7 @@ class TokenRepository:
             self,
             user_id: str,
     ) -> None:
+        """Delete all active sessions for a user (logout from all devices)."""
         cursor = 0
         while True:
             cursor, keys = await self._redis.scan(

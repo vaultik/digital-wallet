@@ -5,6 +5,8 @@ from pydantic import BaseModel, EmailStr, field_validator
 
 
 class RegisterRequest(BaseModel):
+    """Request body for user registration."""
+
     username: str
     email: EmailStr | None = None
     password: str
@@ -22,16 +24,25 @@ class RegisterRequest(BaseModel):
             raise ValueError('Password must contain at least one special character (!@#$...)')
         return value
 
+
 class LoginRequest(BaseModel):
+    """Request body for user login."""
+
     username: str
     password: str
 
+
 class TokenResponse(BaseModel):
+    """Response body containing access token details."""
+
     access_token: str
     token_type: Literal['Bearer'] = 'Bearer'
     expires_in: int
 
+
 class TokenPayload(BaseModel):
+    """JWT token payload claims."""
+
     sub: str
     sid: str
     exp: int

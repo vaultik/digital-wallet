@@ -66,7 +66,6 @@ async def test_login_wrong_password(
 
 async def test_login_user_not_found(
         async_client: AsyncClient,
-        test_user: dict,
         nonexistent_user: dict
 ):
     """Login with non-existent username returns 401 Unauthorized."""

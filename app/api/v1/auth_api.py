@@ -1,6 +1,8 @@
 # app/api/v1/auth_api.py
-from fastapi import APIRouter, Cookie, HTTPException, Response
-from fastapi.params import Depends
+from fastapi import (
+    APIRouter, Cookie, Depends,
+    HTTPException, Response
+)
 
 from app.api.dependencies import get_auth_service
 from app.core.utils import set_refresh_cookie

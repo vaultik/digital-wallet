@@ -34,7 +34,7 @@ class Settings(BaseSettings):
             f'@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}'
         )
 
-    # Superuser
+    # Redis
     redis_url: str = 'redis://localhost:6379'
 
     # Tests

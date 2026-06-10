@@ -1,12 +1,12 @@
 # app/core/exceptions.py
 class InvalidTokenError(Exception):
-    pass
+    """Raised when JWT token is invalid, expired or revoked."""
 
 class InvalidCredentialsError(Exception):
-    pass
+    """Raised when username or password is incorrect."""
 
 class UserAlreadyExistsError(Exception):
-    pass
+    """Raised when username or email is already registered."""
 
 class UserNotFoundError(Exception):
-    pass
+    """Raised when requested user does not exist."""

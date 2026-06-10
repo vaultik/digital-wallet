@@ -7,6 +7,7 @@ from app.core.db import get_async_session
 from app.models.user import User
 
 class UserRepository:
+    """Handles all database operations for User model."""
 
     def __init__(self, db: AsyncSession = Depends(get_async_session)):
         self._db = db
@@ -17,13 +18,14 @@ class UserRepository:
             email: str | None,
             hashed_password: str,
     ) -> User:
+        """Create and persist a new user. Flushes to get DB-generated id."""
         payload = {
             'username': username,
             'email': email,
             'hashed_password': hashed_password
         }
         user = User(**payload)
-        self._db.add(user)  # Почему без await?
+        self._db.add(user)
         await self._db.flush()
         await self._db.commit()
         await self._db.refresh(user)

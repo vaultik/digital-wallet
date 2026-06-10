@@ -1,4 +1,6 @@
 # app/core/exception_handlers.py
+from http import HTTPStatus
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
@@ -15,7 +17,7 @@ async def handle_invalid_credentials(
 ) -> JSONResponse:
     """Return 401 for invalid login credentials."""
     return JSONResponse(
-        status_code=401,
+        status_code=HTTPStatus.UNAUTHORIZED,
         content={'detail': str(exc)}
     )
 
@@ -24,7 +26,7 @@ async def handle_invalid_token(
 ) -> JSONResponse:
     """Return 401 for invalid or expired tokens."""
     return JSONResponse(
-        status_code=401,
+        status_code=HTTPStatus.UNAUTHORIZED,
         content={'detail': str(exc)}
     )
 
@@ -33,7 +35,7 @@ async def handle_user_already_exists(
 ) -> JSONResponse:
     """Return 409 when username or email is already taken."""
     return JSONResponse(
-        status_code=409,
+        status_code=HTTPStatus.CONFLICT,
         content={'detail': str(exc)}
     )
 
@@ -42,7 +44,7 @@ async def handle_user_not_found(
 ) -> JSONResponse:
     """Return 404 when requested user does not exist."""
     return JSONResponse(
-        status_code=404,
+        status_code=HTTPStatus.NOT_FOUND,
         content={'detail': str(exc)}
     )
 

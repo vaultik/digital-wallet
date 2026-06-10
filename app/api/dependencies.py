@@ -12,6 +12,7 @@ async def get_auth_service(
         token_repo: TokenRepository = Depends(TokenRepository),
         user_repo: UserRepository = Depends(UserRepository),
 ) -> AuthService:
+    """Dependency factory for AuthService with injected repositories."""
     return AuthService(
         token_repo=token_repo,
         user_repo=user_repo
