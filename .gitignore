@@ -208,4 +208,6 @@ marimo/_lsp/
 __marimo__/
 
 .DS_Store
+*.pyccookies.txt
 *.pyc
+cookies.txt
