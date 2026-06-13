@@ -1,0 +1,47 @@
+# app/schemas/auth_schemas.py
+from datetime import datetime as dt
+from decimal import Decimal
+from typing import Annotated, List
+
+from pydantic import (
+    BaseModel, ConfigDict, Field, UUID4
+)
+
+PositiveDecimal = Annotated[Decimal, Field(gt=0)]
+PositiveAndNullDecimal = Annotated[Decimal, Field(ge=0)]
+CorrectlyCurrency = Annotated[str, Field(pattern='^[A-Z]{2,5}$')]
+
+
+class WalletBaseModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WalletCreate(BaseModel):
+    currency: CorrectlyCurrency
+
+
+class WalletResponse(WalletBaseModel):
+    currency: CorrectlyCurrency
+    wallet_id: UUID4 = Field(alias='id')
+    balance: PositiveAndNullDecimal
+    created_at: dt = Field(default_factory=dt.utcnow)
+
+
+class WalletListResponse(WalletBaseModel):
+    items: List[WalletResponse]
+    total: int
+    limit: int = 20
+    offset: int = 0
+
+
+class TransferCreate(BaseModel):
+    sender_wallet_id: UUID4
+    receiver_wallet_id: UUID4
+    amount: PositiveDecimal
+
+
+class TransferResponse(WalletBaseModel):
+    group_id: UUID4
+    sender_balance: PositiveAndNullDecimal
+    currency: CorrectlyCurrency
+    created_at: dt = Field(default_factory=dt.utcnow)
