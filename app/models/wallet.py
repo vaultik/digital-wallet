@@ -28,7 +28,9 @@ class Wallet(IdTimeMixin, Base):
         ForeignKey('currency.code', name='fk_wallet_currency_code')
     )
     balance: Mapped[Decimal] = mapped_column(
-        Numeric(CRYPTO_PRECISION, CRYPTO_SCALE)
+        Numeric(CRYPTO_PRECISION, CRYPTO_SCALE),
+        default=Decimal('0'),
+        server_default='0'
     )
 
     user: Mapped['User'] = relationship(

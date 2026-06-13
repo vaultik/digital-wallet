@@ -13,7 +13,10 @@ CorrectlyCurrency = Annotated[str, Field(pattern='^[A-Z]{2,5}$')]
 
 
 class WalletBaseModel(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True
+    )
 
 
 class WalletCreate(BaseModel):
@@ -22,7 +25,7 @@ class WalletCreate(BaseModel):
 
 class WalletResponse(WalletBaseModel):
     currency: CorrectlyCurrency
-    wallet_id: UUID4 = Field(alias='id')
+    wallet_id: UUID4 = Field(serialization_alias='wallet_id', alias='id')
     balance: PositiveAndNullDecimal
     created_at: dt = Field(default_factory=dt.utcnow)
 

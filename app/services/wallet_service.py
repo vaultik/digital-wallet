@@ -45,6 +45,8 @@ class WalletService:
         if wallet is not None:
             raise WalletAlreadyExistsError('Wallet already exist')
         wallet = await self.wallet_repo.create(user_id, data.currency)
+        await self._db.commit()
+        await self._db.refresh(wallet)
         return WalletResponse.model_validate(wallet)
 
     async def get_wallet(
