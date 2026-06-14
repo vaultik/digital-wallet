@@ -18,6 +18,7 @@ async def get_current_user(
         token: str = Depends(oauth2_scheme),
         user_repo: UserRepository = Depends(UserRepository)
 ) -> User:
+    """Decode Bearer token and return the active user. Raise 401 if invalid."""
     payload = decode_token(token)
     user = await user_repo.get_by_id(payload.sub)
     if user is None or not user.is_active:

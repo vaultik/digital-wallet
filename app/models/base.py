@@ -10,7 +10,7 @@ from sqlalchemy.orm import (
 
 
 class Base(DeclarativeBase):
-    """Base class for all models."""
+    """Base class for all SQLAlchemy models."""
 
     @declared_attr
     def __tablename__(self) -> str:
@@ -22,7 +22,7 @@ class Base(DeclarativeBase):
 
 
 class IdTimeMixin:
-    """Mixin with timestamps and ID."""
+    """Mixin that adds UUID primary key and UTC timestamps to any model."""
 
     __abstract__ = True
 

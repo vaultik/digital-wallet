@@ -10,6 +10,7 @@ from app.models import Transaction
 
 
 class TransactionRepository:
+    """Handles persistence of double-entry bookkeeping transaction records."""
 
     def __init__(self, db: AsyncSession = Depends(get_async_session)):
         self._db = db
@@ -22,6 +23,9 @@ class TransactionRepository:
             group_id: UUID,
             transaction_type: str
     ) -> Transaction:
+        """
+        Add a single debit or credit entry to the session without flushing.
+        """
         payload = {
             'wallet_id': wallet_id,
             'entry_type': entry_type,

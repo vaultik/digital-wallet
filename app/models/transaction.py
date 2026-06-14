@@ -18,6 +18,13 @@ from app.models.base import Base, IdTimeMixin
 
 
 class Transaction(IdTimeMixin, Base):
+    """
+    Double-entry bookkeeping record.
+
+    Each financial operation creates two rows (DEBIT + CREDIT)
+    linked by group_id. amount is always positive.
+    """
+
     idempotency_key: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey(
             'idempotency_records.id',
@@ -28,7 +35,7 @@ class Transaction(IdTimeMixin, Base):
     group_id: Mapped[uuid.UUID] = mapped_column(
         UUID,
         default=uuid.uuid4,
-        index=True
+        index=True  # used to fetch both legs of a transaction
     )
     wallet_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey('wallet.id', name='fk_transaction_wallet_id'),
@@ -65,6 +72,10 @@ class Transaction(IdTimeMixin, Base):
 
 
 class IdempotencyRecord(IdTimeMixin, Base):
+    """
+    Stores request/response pairs to prevent duplicate financial operations.
+    """
+
     __tablename__ = 'idempotency_records'
 
     key: Mapped[uuid.UUID] = mapped_column(UUID, unique=True)

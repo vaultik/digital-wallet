@@ -29,6 +29,7 @@ async def create_wallet(
         current_user: User = Depends(get_current_user),
         service: WalletService = Depends()
 ) -> WalletResponse:
+    """Create a new currency wallet for the authenticated user."""
     return await service.create_wallet(
         user_id=current_user.id,
         data=data
@@ -46,6 +47,7 @@ async def get_wallets(
         current_user: User = Depends(get_current_user),
         service: WalletService = Depends()
 ) -> WalletListResponse:
+    """Return paginated list of wallets owned by the authenticated user."""
     return await service.get_wallets(
         user_id=current_user.id,
         limit=limit,
@@ -63,6 +65,9 @@ async def get_wallet(
         current_user: User = Depends(get_current_user),
         service: WalletService = Depends()
 ) -> WalletResponse:
+    """
+    Return a single wallet by ID. Returns 404 for foreign or missing wallets.
+    """
     return await service.get_wallet(
         wallet_id=wallet_id,
         current_user_id=current_user.id
@@ -80,6 +85,9 @@ async def transfer(
         service: WalletService = Depends(),
         idempotency_key: UUID = Header(..., alias='Idempotency-Key')
 ) -> TransferResponse:
+    """
+    Execute an atomic P2P transfer between two wallets of the same currency.
+    """
     return await service.transfer(
         current_user_id=current_user.id,
         data=data

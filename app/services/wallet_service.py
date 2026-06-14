@@ -1,5 +1,4 @@
 # app/services/auth_service.py
-from datetime import datetime as dt
 from uuid import UUID, uuid4
 
 from fastapi import Depends
@@ -39,6 +38,9 @@ class WalletService:
     async def create_wallet(
             self, user_id: UUID, data: WalletCreate
     ) -> WalletResponse:
+        """
+        Create a new wallet for the user. Raise 409 if currency wallet already exists.
+        """
         wallet = await self.wallet_repo.get_by_user_and_currency(
                 user_id, data.currency
         )
@@ -52,6 +54,9 @@ class WalletService:
     async def get_wallet(
             self, wallet_id: UUID, current_user_id: UUID
     ) -> WalletResponse:
+        """
+        Return wallet by ID. Raise 404 if not found or belongs to another user.
+        """
         wallet = await self.wallet_repo.get_by_id(wallet_id)
         if wallet is None or wallet.user_id != current_user_id:
             raise WalletNotFoundError('Wallet not found')
@@ -60,6 +65,7 @@ class WalletService:
     async def get_wallets(
             self, user_id: UUID, limit: int, offset: int
     ) -> WalletListResponse:
+        """Return paginated list of wallets owned by the user."""
         wallets, total = await self.wallet_repo.get_all_by_user(
             user_id, limit, offset
         )
@@ -73,6 +79,12 @@ class WalletService:
     async def transfer(
             self, current_user_id: UUID, data: TransferCreate
     ) -> TransferResponse:
+        """
+        Execute P2P transfer between two wallets atomically.
+
+        Uses SELECT FOR UPDATE with lock ordering to prevent race conditions.
+        Creates double-entry bookkeeping records (DEBIT + CREDIT) linked by group_id.
+        """
         sender_wallet = await self.wallet_repo.get_by_id(data.sender_wallet_id)
         if sender_wallet is None or sender_wallet.user_id != current_user_id:
             raise WalletNotFoundError('Wallet not found')

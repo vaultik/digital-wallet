@@ -13,6 +13,8 @@ from app.models.base import Base, IdTimeMixin
 
 
 class User(IdTimeMixin, Base):
+    """Application user with optional email and bcrypt-hashed password."""
+
     username: Mapped[str] = mapped_column(
         String(length=STR_MED),
         unique=True,
@@ -42,7 +44,7 @@ class User(IdTimeMixin, Base):
             'idx_active_user_email',
             'email',
             unique=True,
-            postgresql_where="is_active IS TRUE"
+            postgresql_where="is_active IS TRUE"  # partial index - only active users
         ),
     )
 

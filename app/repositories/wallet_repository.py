@@ -20,6 +20,7 @@ class WalletRepository:
     async def get_by_id(
             self, wallet_id: UUID
     ) -> Wallet | None:
+        """Fetch wallet by primary key. Return None if not found."""
         result = await self._db.execute(
             select(Wallet).where(Wallet.id == wallet_id)
         )
@@ -28,6 +29,9 @@ class WalletRepository:
     async def get_by_user_and_currency(
             self, user_id: UUID, currency: str
     ) -> Wallet | None:
+        """
+        Fetch wallet by owner and currency code. Used for duplicate detection.
+        """
         result = await self._db.execute(
             select(Wallet).where(
                 Wallet.user_id == user_id,
@@ -39,6 +43,7 @@ class WalletRepository:
     async def get_all_by_user(
             self, user_id: UUID, limit: int, offset: int
     ) -> tuple[list[Wallet], int]:
+        """Return paginated wallets and total count for a given user."""
         count_stmt = select(func.count()).select_from(Wallet).where(
                 Wallet.user_id == user_id
             )
@@ -55,6 +60,7 @@ class WalletRepository:
     async def create(
             self, user_id: UUID, currency: str
     ) -> Wallet:
+        """Persist a new wallet with zero balance. Flush but do not commit."""
         payload = {
             'user_id': user_id,
             'currency': currency
@@ -68,6 +74,11 @@ class WalletRepository:
     async def get_wallets_for_update(
             self, wallets_ids: list[UUID]
     ) -> list[Wallet]:
+        """
+        Lock wallet rows for atomic update using SELECT FOR UPDATE.
+
+        Rows are ordered by ID to prevent deadlocks (lock ordering convention).
+        """
         result = await self._db.execute(
             select(Wallet).with_for_update(of=Wallet).where(
                 Wallet.id.in_(wallets_ids)
