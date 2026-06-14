@@ -20,6 +20,8 @@ from app.models.base import Base, IdTimeMixin
 
 
 class Wallet(IdTimeMixin, Base):
+    """Single-currency wallet. One wallet per user per currency."""
+
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey('user.id', name='fk_wallet_user_id'),
         index=True,
@@ -28,7 +30,9 @@ class Wallet(IdTimeMixin, Base):
         ForeignKey('currency.code', name='fk_wallet_currency_code')
     )
     balance: Mapped[Decimal] = mapped_column(
-        Numeric(CRYPTO_PRECISION, CRYPTO_SCALE)
+        Numeric(CRYPTO_PRECISION, CRYPTO_SCALE),
+        default=Decimal('0'),
+        server_default='0'  # dual default: python side and DB side guard
     )
 
     user: Mapped['User'] = relationship(
@@ -58,6 +62,10 @@ class Wallet(IdTimeMixin, Base):
 
 
 class Currency(Base):
+    """
+    Reference table of supported currencies. Populated via data migration.
+    """
+
     code: Mapped[str] = mapped_column(
         String(STR_MINI), primary_key=True,
     )

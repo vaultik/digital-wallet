@@ -24,3 +24,12 @@ CRYPTO_SCALE: int = 18
 # JWT expires
 ACCESS_EXPIRE: int = 60 * 15
 REFRESH_EXPIRE: int = 60 * 60 * 24 * 7
+
+# Transactions
+class EntryType:
+    DEBIT = 'DEBIT'
+    CREDIT = 'CREDIT'
+
+class TransactionType:
+    LOCAL = 'LOCAL'
+    STRIPE = 'STRIPE'

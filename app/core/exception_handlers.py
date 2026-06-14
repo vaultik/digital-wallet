@@ -7,8 +7,11 @@ from fastapi.responses import JSONResponse
 from app.core.exceptions import (
     InvalidCredentialsError,
     InvalidTokenError,
+    InvalidWalletsDataError,
     UserAlreadyExistsError,
     UserNotFoundError,
+    WalletAlreadyExistsError,
+    WalletNotFoundError,
 )
 
 
@@ -21,6 +24,7 @@ async def handle_invalid_credentials(
         content={'detail': str(exc)}
     )
 
+
 async def handle_invalid_token(
         request: Request, exc: InvalidTokenError
 ) -> JSONResponse:
@@ -30,6 +34,7 @@ async def handle_invalid_token(
         content={'detail': str(exc)}
     )
 
+
 async def handle_user_already_exists(
         request: Request, exc: UserAlreadyExistsError
 ) -> JSONResponse:
@@ -38,6 +43,7 @@ async def handle_user_already_exists(
         status_code=HTTPStatus.CONFLICT,
         content={'detail': str(exc)}
     )
+
 
 async def handle_user_not_found(
         request: Request, exc: UserNotFoundError
@@ -49,9 +55,42 @@ async def handle_user_not_found(
     )
 
 
+async def handle_wallet_already_exists(
+        request: Request, exc: WalletAlreadyExistsError
+) -> JSONResponse:
+    """Return 409 when wallet already exists."""
+    return JSONResponse(
+        status_code=HTTPStatus.CONFLICT,
+        content={'detail': str(exc)}
+    )
+
+
+async def handle_wallet_not_found(
+        request: Request, exc: WalletNotFoundError
+) -> JSONResponse:
+    """Return 404 when wallet does not exist."""
+    return JSONResponse(
+        status_code=HTTPStatus.NOT_FOUND,
+        content={'detail': str(exc)}
+    )
+
+
+async def handle_invalid_wallet_data(
+        request: Request, exc: InvalidWalletsDataError
+) -> JSONResponse:
+    """Return 400 when wallet operation data is invalid."""
+    return JSONResponse(
+        status_code=HTTPStatus.BAD_REQUEST,
+        content={'detail': str(exc)}
+    )
+
+
 EXCEPTION_HANDLERS = {
     InvalidCredentialsError: handle_invalid_credentials,
     InvalidTokenError: handle_invalid_token,
+    InvalidWalletsDataError: handle_invalid_wallet_data,
     UserAlreadyExistsError: handle_user_already_exists,
     UserNotFoundError: handle_user_not_found,
+    WalletAlreadyExistsError: handle_wallet_already_exists,
+    WalletNotFoundError: handle_wallet_not_found,
 }

@@ -10,3 +10,12 @@ class UserAlreadyExistsError(Exception):
 
 class UserNotFoundError(Exception):
     """Raised when requested user does not exist."""
+
+class WalletAlreadyExistsError(Exception):
+    """Raised when wallet already existed."""
+
+class WalletNotFoundError(Exception):
+    """Raised when requested wallet does not exist."""
+
+class InvalidWalletsDataError(Exception):
+    """Raised when wallet's data is incorrect."""
