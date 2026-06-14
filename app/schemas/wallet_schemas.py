@@ -2,6 +2,7 @@
 from datetime import datetime as dt
 from decimal import Decimal
 from typing import Annotated, List
+from uuid import UUID
 
 from pydantic import (
     BaseModel, ConfigDict, Field, UUID4
@@ -38,8 +39,8 @@ class WalletListResponse(WalletBaseModel):
 
 
 class TransferCreate(BaseModel):
-    sender_wallet_id: UUID4
-    receiver_wallet_id: UUID4
+    sender_wallet_id: UUID
+    receiver_wallet_id: UUID
     amount: PositiveDecimal
 
 

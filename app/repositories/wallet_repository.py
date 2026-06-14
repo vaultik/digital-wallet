@@ -69,7 +69,7 @@ class WalletRepository:
             self, wallets_ids: list[UUID]
     ) -> list[Wallet]:
         result = await self._db.execute(
-            select(Wallet).with_for_update().where(
+            select(Wallet).with_for_update(of=Wallet).where(
                 Wallet.id.in_(wallets_ids)
             ).order_by(Wallet.id)
         )
