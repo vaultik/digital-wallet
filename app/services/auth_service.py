@@ -102,7 +102,7 @@ class AuthService:
         """
         user = await self._user_repo.get_by_username(data.username)
 
-        if user is None:
+        if user is None or not user.is_active:
             raise InvalidCredentialsError('Invalid username or password')
         if not verify_password(data.password, user.hashed_password):
             raise InvalidCredentialsError('Invalid username or password')
