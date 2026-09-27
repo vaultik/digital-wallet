@@ -8,9 +8,11 @@ from pydantic import (
     BaseModel, ConfigDict, Field, UUID4
 )
 
-PositiveDecimal = Annotated[Decimal, Field(gt=0)]
-PositiveAndNullDecimal = Annotated[Decimal, Field(ge=0)]
-CorrectlyCurrency = Annotated[str, Field(pattern='^[A-Z]{2,5}$')]
+from app.core.constants import (
+    POSITIVE_DECIMAL,
+    POSITIVE_AND_NULL_DECIMAL,
+    CORRECTLY_CURRENCY
+)
 
 
 class WalletBaseModel(BaseModel):
@@ -25,14 +27,14 @@ class WalletBaseModel(BaseModel):
 
 class WalletCreate(BaseModel):
     """Request body for wallet creation."""
-    currency: CorrectlyCurrency
+    currency: CORRECTLY_CURRENCY
 
 
 class WalletResponse(WalletBaseModel):
     """Single wallet representation returned to the client."""
-    currency: CorrectlyCurrency
+    currency: CORRECTLY_CURRENCY
     wallet_id: UUID4 = Field(serialization_alias='wallet_id', alias='id')
-    balance: PositiveAndNullDecimal
+    balance: POSITIVE_AND_NULL_DECIMAL
     created_at: dt = Field(default_factory=dt.utcnow)
 
 
@@ -48,12 +50,12 @@ class TransferCreate(BaseModel):
     """Request body for P2P transfer between two wallets."""
     sender_wallet_id: UUID
     receiver_wallet_id: UUID
-    amount: PositiveDecimal
+    amount: POSITIVE_DECIMAL
 
 
 class TransferResponse(WalletBaseModel):
     """Transfer result returned to the sender."""
     group_id: UUID4
-    sender_balance: PositiveAndNullDecimal
-    currency: CorrectlyCurrency
+    sender_balance: POSITIVE_AND_NULL_DECIMAL
+    currency: CORRECTLY_CURRENCY
     created_at: dt = Field(default_factory=dt.utcnow)
