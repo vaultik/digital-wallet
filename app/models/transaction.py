@@ -4,9 +4,8 @@ from decimal import Decimal
 
 from sqlalchemy import (
     CheckConstraint, ForeignKey,
-    Index, Numeric, String, UUID,
+    Numeric, String, UUID,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import (
     Mapped, mapped_column, relationship
 )
@@ -57,8 +56,8 @@ class Transaction(IdTimeMixin, Base):
 
     __table_args__ = (
         CheckConstraint(
-            'amount >= 0',
-            name='check_positive_balance'
+            'amount > 0',
+            name='check_transaction_positive_amount'
         ),
         CheckConstraint(
             "entry_type IN ('DEBIT', 'CREDIT')",
@@ -69,15 +68,3 @@ class Transaction(IdTimeMixin, Base):
             name='check_valid_transaction_type'
         )
     )
-
-
-class IdempotencyRecord(IdTimeMixin, Base):
-    """
-    Stores request/response pairs to prevent duplicate financial operations.
-    """
-
-    __tablename__ = 'idempotency_records'
-
-    key: Mapped[uuid.UUID] = mapped_column(UUID, unique=True)
-    response_body: Mapped[dict] = mapped_column(JSONB)
-    response_status: Mapped[int] = mapped_column()

@@ -27,6 +27,9 @@ class User(IdTimeMixin, Base):
         String(STR_LONG),
         nullable=False
     )
+    is_system_user: Mapped[bool] = mapped_column(
+        Boolean, default=False
+    )
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True
     )
