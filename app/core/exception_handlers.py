@@ -8,6 +8,8 @@ from app.core.exceptions import (
     InvalidCredentialsError,
     InvalidTokenError,
     InvalidWalletsDataError,
+    InvalidWebhookSignatureError,
+    PaymentProviderError,
     UserAlreadyExistsError,
     UserNotFoundError,
     WalletAlreadyExistsError,
@@ -85,10 +87,32 @@ async def handle_invalid_wallet_data(
     )
 
 
+async def handle_payment_provider_unavailable(
+        request: Request, exc: PaymentProviderError
+) -> JSONResponse:
+    """Return 502 when payment provider is unavailable."""
+    return JSONResponse(
+        status_code=HTTPStatus.BAD_GATEWAY,
+        content={'detail': str(exc)}
+    )
+
+
+async def handle_invalid_webhook_signature_error(
+        request: Request, exc: InvalidWebhookSignatureError
+) -> JSONResponse:
+    """Return 400 when webhook signature is invalid."""
+    return JSONResponse(
+        status_code=HTTPStatus.BAD_REQUEST,
+        content={'detail': str(exc)}
+    )
+
+
 EXCEPTION_HANDLERS = {
     InvalidCredentialsError: handle_invalid_credentials,
     InvalidTokenError: handle_invalid_token,
     InvalidWalletsDataError: handle_invalid_wallet_data,
+    InvalidWebhookSignatureError: handle_invalid_webhook_signature_error,
+    PaymentProviderError: handle_payment_provider_unavailable,
     UserAlreadyExistsError: handle_user_already_exists,
     UserNotFoundError: handle_user_not_found,
     WalletAlreadyExistsError: handle_wallet_already_exists,

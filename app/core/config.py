@@ -40,5 +40,11 @@ class Settings(BaseSettings):
     # Tests
     testing: bool = False
 
+    # Stripe
+    stripe_secret_key: str
+    stripe_webhook_secret: str
+    stripe_success_url: str = 'http://localhost:8000/deposit/success'
+    stripe_cancel_url: str = 'http://localhost:8000/deposit/cancel'
+
 
 settings = Settings()
