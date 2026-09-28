@@ -71,21 +71,19 @@ class PaymentService:
 
         try:
             stripe_session = await self.stripe_client.v1.checkout.sessions.create_async(
-                mode='payment',
-                success_url=settings.stripe_success_url,
-                cancel_url=settings.stripe_cancel_url,
-                line_items=[{
-                    'price_data': {
-                        'currency': currency.code.lower(),
-                        'unit_amount': amount_in_cents,
-                        'product_data': {
-                            'name': f'Deposit {data.amount} {currency.code}',
-                        }
-                    },
-                    'quantity': 1,
-                }],
-                metadata={
-                    'wallet_id': str(wallet.id),
+                params={
+                    'mode': 'payment',
+                    'success_url': settings.stripe_success_url,
+                    'cancel_url': settings.stripe_cancel_url,
+                    'line_items': [{
+                        'price_data': {
+                            'currency': currency.code.lower(),
+                            'unit_amount': amount_in_cents,
+                            'product_data': {'name': f'Deposit {data.amount} {currency.code}'}
+                        },
+                        'quantity': 1,
+                    }],
+                    'metadata': {'wallet_id': str(wallet.id)}
                 }
             )
             checkout_url = stripe_session.url
