@@ -18,7 +18,10 @@ def hash_password(plain: str) -> str:
 
 def verify_password(plain:str, hashed: str) -> bool:
     """Verify plain text password against bcrypt hash."""
-    return pwd_context.verify(plain, hashed)
+    try:
+        return pwd_context.verify(plain, hashed)
+    except ValueError:
+        return False
 
 
 def _create_token(
