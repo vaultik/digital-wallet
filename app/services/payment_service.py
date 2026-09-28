@@ -123,7 +123,7 @@ class PaymentService:
         if session.payment_status != 'paid':
             return
 
-        wallet_id_str = session.metadata.get('wallet_id')
+        wallet_id_str = session.to_dict().get('metadata', {}).get('wallet_id')
         if not wallet_id_str:
             logger.warning('session.metadata.get("wallet_id") is empty')
             return
