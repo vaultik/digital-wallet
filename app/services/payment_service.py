@@ -25,7 +25,7 @@ from app.repositories import (
     TransactionRepository,
     WebhookIdempotencyRepository,
 )
-from app.services import WalletService
+from app.services.wallet_service import WalletService
 from app.schemas.deposit_schemas import (
     DepositCreate, DepositResponse
 )
