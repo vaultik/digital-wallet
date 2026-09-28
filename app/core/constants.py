@@ -1,4 +1,10 @@
 # app/core/constants.py
+import uuid
+from decimal import Decimal
+from typing import Annotated
+
+from pydantic import Field
+
 
 # FastAPI
 APP_TITLE: str = 'Digital Wallet'
@@ -8,12 +14,14 @@ DESCRIPTION: str = (
     ' top-ups via Stripe etc.'
 )
 
+
 # Character limit for the database
 STR_MINI: int = 10
 STR_SHORT: int = 20
 STR_MED: int = 128
 STR_LONG: int = 256
 STR_XL: int = 1024
+
 
 # Settings for Decimal
 FIAT_PRECISION: int = 18
@@ -25,6 +33,7 @@ CRYPTO_SCALE: int = 18
 ACCESS_EXPIRE: int = 60 * 15
 REFRESH_EXPIRE: int = 60 * 60 * 24 * 7
 
+
 # Transactions
 class EntryType:
     DEBIT = 'DEBIT'
@@ -33,3 +42,13 @@ class EntryType:
 class TransactionType:
     LOCAL = 'LOCAL'
     STRIPE = 'STRIPE'
+
+
+# For wallet and deposit schemas
+POSITIVE_DECIMAL = Annotated[Decimal, Field(gt=0)]
+POSITIVE_AND_NULL_DECIMAL = Annotated[Decimal, Field(ge=0)]
+CORRECTLY_CURRENCY = Annotated[str, Field(pattern='^[A-Z]{2,5}$')]
+
+
+# System User
+SYSTEM_USER_ID = uuid.UUID('09875260-0520-0003-5000-096240009401')

@@ -1,16 +1,23 @@
-# app/services/auth_service.py
+# app/services/wallet_service.py
+import logging
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.constants import EntryType, TransactionType
+from app.core.constants import (
+    SYSTEM_USER_ID,
+    EntryType,
+    TransactionType,
+)
 from app.core.db import get_async_session
 from app.core.exceptions import (
     InvalidWalletsDataError,
     WalletAlreadyExistsError,
     WalletNotFoundError
 )
+from app.models import Transaction, Wallet
 from app.repositories import (
     TransactionRepository,
     WalletRepository
@@ -22,6 +29,9 @@ from app.schemas.wallet_schemas import (
     WalletListResponse,
     WalletResponse,
 )
+
+logger = logging.getLogger(__name__)
+
 
 class WalletService:
 
@@ -76,6 +86,65 @@ class WalletService:
             offset=offset
         )
 
+    async def get_or_create_wallet(
+            self, user_id: UUID, currency: str, is_system: bool = False
+    ) -> Wallet:
+        """
+        Return the user's wallet for the given currency, creating it if missing.
+
+        Pass is_system=True only for the internal clearing wallet used for
+        external (Stripe) deposits.
+        """
+        wallet = await self.wallet_repo.get_by_user_and_currency(
+            user_id, currency
+        )
+        if wallet is not None:
+            return wallet
+        return await self.wallet_repo.create(user_id, currency, is_system)
+
+    async def _lock_and_apply_double_entry(
+            self,
+            debit_wallet_id: UUID,
+            credit_wallet_id: UUID,
+            amount: Decimal,
+            transaction_type: str,
+    ) -> tuple[Wallet, Wallet, UUID, Transaction]:
+        """
+        Lock both wallets (deadlock-safe order), adjust balances,
+        and create the DEBIT/CREDIT ledger pair. Caller commits.
+        """
+        wallets = await self.wallet_repo.get_wallets_for_update([
+            debit_wallet_id, credit_wallet_id
+        ])
+        if len(wallets) != 2:
+            raise WalletNotFoundError('Wallet not found')
+        if debit_wallet_id < credit_wallet_id:
+            sender_wallet, receiver_wallet = wallets
+        else:
+            receiver_wallet, sender_wallet = wallets
+        if not sender_wallet.is_system and sender_wallet.balance < amount:
+            raise InvalidWalletsDataError('The amount is insufficient')
+
+        sender_wallet.balance -= amount
+        receiver_wallet.balance += amount
+
+        group_id = uuid4()
+        transaction_sender = await self.transaction_repo.create_entry(
+            wallet_id=sender_wallet.id,
+            entry_type=EntryType.DEBIT,
+            amount=amount,
+            group_id=group_id,
+            transaction_type=transaction_type
+        )
+        transaction_receiver = await self.transaction_repo.create_entry(
+            wallet_id=receiver_wallet.id,
+            entry_type=EntryType.CREDIT,
+            amount=amount,
+            group_id=group_id,
+            transaction_type=transaction_type
+        )
+        return sender_wallet, receiver_wallet, group_id, transaction_sender
+
     async def transfer(
             self, current_user_id: UUID, data: TransferCreate
     ) -> TransferResponse:
@@ -96,35 +165,13 @@ class WalletService:
         if sender_wallet.currency != receiver_wallet.currency:
             raise InvalidWalletsDataError('The currency does not match')
 
-        wallets = await self.wallet_repo.get_wallets_for_update([
-            sender_wallet.id, receiver_wallet.id
-        ])
-        if len(wallets) != 2:
-            raise WalletNotFoundError('Wallet not found')
-        if sender_wallet.id < receiver_wallet.id:
-            sender_wallet, receiver_wallet = wallets
-        else:
-            receiver_wallet, sender_wallet = wallets
-        if sender_wallet.balance < data.amount:
-            raise InvalidWalletsDataError('The amount is insufficient')
-
-        sender_wallet.balance -= data.amount
-        receiver_wallet.balance += data.amount
-
-        group_id = uuid4()
-        transaction_sender = await self.transaction_repo.create_entry(
-            wallet_id=sender_wallet.id,
-            entry_type=EntryType.DEBIT,
-            amount=data.amount,
-            group_id=group_id,
-            transaction_type=TransactionType.LOCAL
-        )
-        transaction_receiver = await self.transaction_repo.create_entry(
-            wallet_id=receiver_wallet.id,
-            entry_type=EntryType.CREDIT,
-            amount=data.amount,
-            group_id=group_id,
-            transaction_type=TransactionType.LOCAL
+        sender_wallet, receiver_wallet, group_id, transaction_sender = (
+            await self._lock_and_apply_double_entry(
+                debit_wallet_id=sender_wallet.id,
+                credit_wallet_id=receiver_wallet.id,
+                amount=data.amount,
+                transaction_type=TransactionType.LOCAL,
+            )
         )
         await self._db.flush()
         await self._db.commit()
@@ -136,3 +183,33 @@ class WalletService:
             currency=sender_wallet.currency,
             created_at=transaction_sender.created_at
         )
+
+    async def credit_external_deposit(
+            self, wallet_id: UUID, amount: Decimal, currency: str
+    ) -> None:
+        """
+        Credit external funds (e.g. Stripe deposit) to a user's wallet.
+
+        Debits the system clearing wallet, credits the user wallet.
+        """
+        user_wallet = await self.wallet_repo.get_by_id(wallet_id=wallet_id)
+        if not user_wallet:
+            logger.warning('User Wallet not found')
+            raise WalletNotFoundError('Wallet not found')
+        system_wallet = await self.get_or_create_wallet(
+            SYSTEM_USER_ID, currency, is_system=True
+        )
+        if not system_wallet:
+            logger.error('System Wallet not found')
+            raise WalletNotFoundError('Wallet not found')
+        if user_wallet.currency != system_wallet.currency:
+            raise InvalidWalletsDataError('The currency does not match')
+
+        await self._lock_and_apply_double_entry(
+            debit_wallet_id=system_wallet.id,
+            credit_wallet_id=user_wallet.id,
+            amount=amount,
+            transaction_type=TransactionType.STRIPE,
+        )
+        await self._db.flush()
+        await self._db.commit()
