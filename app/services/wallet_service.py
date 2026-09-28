@@ -75,7 +75,9 @@ class WalletService:
     async def get_wallets(
             self, user_id: UUID, limit: int, offset: int
     ) -> WalletListResponse:
-        """Return paginated list of wallets owned by the user."""
+        """
+        Return paginated list of wallets owned by the user.
+        """
         wallets, total = await self.wallet_repo.get_all_by_user(
             user_id, limit, offset
         )

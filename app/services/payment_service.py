@@ -1,18 +1,13 @@
 # app/services/payment_service.py
 import logging
 from decimal import Decimal
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import stripe
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.constants import (
-    SYSTEM_USER_ID,
-    EntryType,
-    TransactionType,
-)
 from app.core.db import get_async_session
 from app.core.exceptions import (
     InvalidPaymentDataError,
@@ -38,18 +33,18 @@ class PaymentService:
     def __init__(
             self,
             currency_repo: CurrencyRepository = Depends(),
+            stripe_client: stripe.StripeClient = Depends(get_stripe_client),
             transaction_repo: TransactionRepository = Depends(),
             wallet_service: WalletService = Depends(),
             webhook_idempotency_repo: WebhookIdempotencyRepository = Depends(),
             db: AsyncSession = Depends(get_async_session),
-            stripe_client: stripe.StripeClient = Depends(get_stripe_client)
     ):
         self.currency_repo = currency_repo
+        self.stripe_client = stripe_client
         self.transaction_repo = transaction_repo
         self.wallet_service = wallet_service
         self.webhook_idempotency_repo = webhook_idempotency_repo
         self._db = db
-        self.stripe_client = stripe_client
 
     async def create_checkout_session(
             self, data: DepositCreate, user_id: UUID

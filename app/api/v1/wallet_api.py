@@ -5,8 +5,8 @@ from fastapi import (
     APIRouter, Depends, Header,
 )
 
-from app.models import User
 from app.api.dependencies import get_current_user
+from app.models import User
 from app.schemas.wallet_schemas import (
     WalletCreate,
     TransferCreate,
