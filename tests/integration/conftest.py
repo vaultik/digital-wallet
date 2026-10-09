@@ -1,8 +1,17 @@
 # tests/integration/conftest.py
-import pytest
-from httpx import ASGITransport, AsyncClient
+from decimal import Decimal
+from typing import AsyncGenerator
+from uuid import UUID
 
+import pytest
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.db import get_async_session
 from app.main import app
+from app.models import Wallet
 
 
 # Auth
@@ -36,7 +45,7 @@ def nonexistent_user() -> dict:
 
 
 # Wallet
-@pytest.fixture
+@pytest_asyncio.fixture
 async def registered_user(
         async_client: AsyncClient,
         test_user: dict
@@ -52,7 +61,7 @@ async def registered_user(
     }
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def auth_client(
         async_client: AsyncClient,
         registered_user: dict
@@ -64,7 +73,7 @@ async def auth_client(
     return async_client
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def user_with_wallet(
         auth_client: AsyncClient
 ) -> tuple[AsyncClient, str]:
@@ -77,10 +86,10 @@ async def user_with_wallet(
     return auth_client, wallet_id
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def second_user_with_wallet(
         async_client: AsyncClient,
-) -> tuple[AsyncClient, str]:
+) -> AsyncGenerator[tuple[AsyncClient, str], None]:
     """Creates second user with USD wallet for transfer tests."""
     second_user = {
         'username': 'second_user',
@@ -93,25 +102,21 @@ async def second_user_with_wallet(
     )
     token = response.json()['access_token']
 
-    second_client = AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url='http://test'
-    )
-    second_client.headers.update({
-        'Authorization': f'Bearer {token}'
-    })
-    wallet_response = await second_client.post(
-        '/api/v1/wallets',
-        json={'currency': 'USD'}
-    )
-    wallet_id = wallet_response.json()['wallet_id']
-    return second_client, wallet_id
+    async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url='http://test',
+            headers={'Authorization': f'Bearer {token}'},
+    ) as second_client:
+        wallet_response = await second_client.post(
+            '/api/v1/wallets', json={'currency': 'USD'}
+        )
+        yield second_client, wallet_response.json()['wallet_id']
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def third_user_with_wallet_diff_currency(
         async_client: AsyncClient,
-) -> tuple[AsyncClient, str]:
+) -> AsyncGenerator[tuple[AsyncClient, str], None]:
     """Creates third user with BTC wallet for transfer tests."""
     third_user = {
         'username': 'third_user',
@@ -124,16 +129,60 @@ async def third_user_with_wallet_diff_currency(
     )
     token = response.json()['access_token']
 
-    third_client = AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url='http://test'
+    async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url='http://test',
+            headers={'Authorization': f'Bearer {token}'},
+    ) as third_client:
+        wallet_response = await third_client.post(
+            '/api/v1/wallets', json={'currency': 'BTC'}
+        )
+        yield third_client, wallet_response.json()['wallet_id']
+
+
+@pytest_asyncio.fixture
+async def funded_wallets(
+        db_session: AsyncSession,
+        user_with_wallet: tuple[AsyncClient, str],
+        second_user_with_wallet: tuple[AsyncClient, str]
+) -> tuple[AsyncClient, str, AsyncClient, str]:
+    """
+    Provision two users with USD wallets and seed the first with 1000 USD.
+
+    Writes through the test session, so the app sees the balance inside
+    the same transaction.
+    """
+    client1, wallet_id1 = user_with_wallet
+    client2, wallet_id2 = second_user_with_wallet
+
+    await db_session.execute(
+        update(Wallet)
+        .where(Wallet.id == UUID(wallet_id1))
+        .values(balance=Decimal('1000'))
     )
-    third_client.headers.update({
-        'Authorization': f'Bearer {token}'
-    })
-    wallet_response = await third_client.post(
-        '/api/v1/wallets',
-        json={'currency': 'BTC'}
-    )
-    wallet_id = wallet_response.json()['wallet_id']
-    return third_client, wallet_id
+    await db_session.commit()
+    db_session.expire_all()
+
+    return client1, wallet_id1, client2, wallet_id2
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def override_session(
+        db_session: AsyncSession
+) -> AsyncGenerator[None, None]:
+    """Make the app use the test's session, then restore the app state."""
+    async def _override() -> AsyncGenerator[AsyncSession, None]:
+        yield db_session
+    app.dependency_overrides[get_async_session] = _override
+    yield
+    app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def async_client(override_session: None) -> AsyncGenerator[AsyncClient, None]:
+    """Anonymous HTTP client; auth is layered on top by other fixtures."""
+    async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url='http://test'
+    ) as client:
+        yield client
