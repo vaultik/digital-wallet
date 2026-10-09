@@ -34,6 +34,15 @@ target_metadata = Base.metadata
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 
+def resolve_database_url() -> str:
+    """
+    Return the URL Alembic should migrate.
+
+    A URL set from the outside (tests, CI) wins; otherwise fall back to
+    the application database from settings.
+    """
+    return config.get_main_option('sqlalchemy.url') or settings.database_url
+
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
@@ -47,7 +56,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    config.set_main_option('sqlalchemy.url', settings.database_url)
+    config.set_main_option('sqlalchemy.url', resolve_database_url())
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -73,7 +82,7 @@ async def run_async_migrations() -> None:
 
     """
 
-    config.set_main_option('sqlalchemy.url', settings.database_url)
+    config.set_main_option('sqlalchemy.url', resolve_database_url())
 
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),

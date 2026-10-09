@@ -13,7 +13,7 @@ def set_refresh_cookie(response: Response, token: str) -> None:
         key='refresh_token',
         value=token,
         httponly=True,
-        secure=not settings.testing,
+        secure=settings.environment == 'production',
         samesite='lax',
         max_age=REFRESH_EXPIRE
     )
