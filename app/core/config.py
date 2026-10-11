@@ -1,7 +1,7 @@
 # app/core/config.py
 from typing import Literal, Optional
 
-from pydantic import EmailStr
+from pydantic import EmailStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,7 +32,33 @@ class Settings(BaseSettings):
     # Environment
     environment: Literal['local', 'production'] = 'local'
 
+    # Stripe
+    stripe_secret_key: str = 'sk_test_fake_key_for_tests'
+    stripe_webhook_secret: str = 'whsec_fake_secret_for_tests'
+    stripe_success_url: str = 'http://localhost:8000/deposit/success'
+    stripe_cancel_url: str = 'http://localhost:8000/deposit/cancel'
+
     model_config = SettingsConfigDict(env_file='.env', extra='ignore')
+
+    @model_validator(mode='after')
+    def validate_production_secrets(self) -> 'Settings':
+        """Refuse to start in production with placeholder credentials."""
+        if self.environment != 'production':
+            return self
+        placeholders = {
+            'stripe_secret_key': self.stripe_secret_key,
+            'stripe_webhook_secret': self.stripe_webhook_secret,
+        }
+        unset = [
+            name for name, value in placeholders.items()
+            if 'fake' in value
+        ]
+        if unset:
+            raise ValueError(
+                f'Production requires real credentials for: '
+                f'{", ".join(unset)}'
+            )
+        return self
 
     @property
     def database_url(self) -> str:
@@ -51,12 +77,6 @@ class Settings(BaseSettings):
             f'{self.postgres_user}:{self.postgres_password}'
             f'@{self.postgres_host}:{self.postgres_port}/{self.postgres_db_test}'
         )
-
-    # Stripe
-    stripe_secret_key: str
-    stripe_webhook_secret: str
-    stripe_success_url: str = 'http://localhost:8000/deposit/success'
-    stripe_cancel_url: str = 'http://localhost:8000/deposit/cancel'
 
 
 settings = Settings()
