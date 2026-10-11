@@ -120,10 +120,11 @@ class WalletService:
         ])
         if len(wallets) != 2:
             raise WalletNotFoundError('Wallet not found')
-        if debit_wallet_id < credit_wallet_id:
-            sender_wallet, receiver_wallet = wallets
-        else:
-            receiver_wallet, sender_wallet = wallets
+
+        wallets_by_id = {wallet.id: wallet for wallet in wallets}
+        sender_wallet = wallets_by_id[debit_wallet_id]
+        receiver_wallet = wallets_by_id[credit_wallet_id]
+
         if not sender_wallet.is_system and sender_wallet.balance < amount:
             raise InvalidWalletsDataError('The amount is insufficient')
 
@@ -175,7 +176,6 @@ class WalletService:
                 transaction_type=TransactionType.LOCAL,
             )
         )
-        await self._db.flush()
         await self._db.commit()
         await self._db.refresh(transaction_sender)
 
@@ -213,5 +213,4 @@ class WalletService:
             amount=amount,
             transaction_type=TransactionType.STRIPE,
         )
-        await self._db.flush()
         await self._db.commit()
