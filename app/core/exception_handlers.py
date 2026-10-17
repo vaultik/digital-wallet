@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from app.core.exceptions import (
     InvalidCredentialsError,
     InvalidTokenError,
+    InvalidRequestHashError,
     InvalidWalletsDataError,
     InvalidWebhookSignatureError,
     PaymentProviderError,
@@ -107,9 +108,20 @@ async def handle_invalid_webhook_signature_error(
     )
 
 
+async def handle_invalid_request_hash_error(
+        request: Request, exc: InvalidRequestHashError
+) -> JSONResponse:
+    """Return 422 when idempotency request hash is invalid."""
+    return JSONResponse(
+        status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
+        content={'detail': str(exc)}
+    )
+
+
 EXCEPTION_HANDLERS = {
     InvalidCredentialsError: handle_invalid_credentials,
     InvalidTokenError: handle_invalid_token,
+    InvalidRequestHashError: handle_invalid_request_hash_error,
     InvalidWalletsDataError: handle_invalid_wallet_data,
     InvalidWebhookSignatureError: handle_invalid_webhook_signature_error,
     PaymentProviderError: handle_payment_provider_unavailable,

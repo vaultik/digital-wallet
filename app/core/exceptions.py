@@ -28,3 +28,6 @@ class PaymentProviderError(Exception):
 
 class InvalidWebhookSignatureError(Exception):
     """Raised when webhook signature invalid."""
+
+class InvalidRequestHashError(Exception):
+    """Raised when Idempotency request hash invalid."""

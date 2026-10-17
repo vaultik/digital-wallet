@@ -1,7 +1,7 @@
 # app/models/idempotency.py
 import uuid
 
-from sqlalchemy import String, UUID
+from sqlalchemy import String, UUID, ForeignKey, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -16,9 +16,21 @@ class IdempotencyRecord(IdTimeMixin, Base):
 
     __tablename__ = 'idempotency_records'
 
-    key: Mapped[uuid.UUID] = mapped_column(UUID, unique=True)
-    response_body: Mapped[dict] = mapped_column(JSONB)
-    response_status: Mapped[int] = mapped_column()
+    key: Mapped[uuid.UUID] = mapped_column(UUID)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey('user.id', name='fk_idempotency_user_id')
+    )
+    request_hash: Mapped[str] = mapped_column(String(64))
+    response_body: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    response_status: Mapped[int | None] = mapped_column(nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint(
+            'user_id',
+            'key',
+            name='uq_idempotency_user_key'
+        ),
+    )
 
 
 class WebhookIdempotencyRecord(IdTimeMixin, Base):

@@ -1,16 +1,20 @@
 # app/api/dependencies.py
+from uuid import UUID
+
 import stripe
-from fastapi import Depends, Request
+from fastapi import Depends, Header, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_async_session
 from app.core.exceptions import UserNotFoundError
+from app.core.idempotency_guard import IdempotencyGuard
 from app.core.security import decode_token
 from app.core.stripe_client import get_stripe_client
 from app.models import User
 from app.repositories import (
     CurrencyRepository,
+    IdempotencyRepository,
     TokenRepository,
     TransactionRepository,
     UserRepository,
@@ -67,3 +71,12 @@ async def get_payment_service(
         webhook_idempotency_repo=webhook_idempotency_repo,
         db=db,
     )
+
+
+async def get_idempotency_guard(
+        idempotency_key: UUID = Header(..., alias='Idempotency-Key'),
+        current_user: User = Depends(get_current_user),
+        repo: IdempotencyRepository = Depends(),
+) -> IdempotencyGuard:
+    """Build a guard bound to this request's key and user."""
+    return IdempotencyGuard(idempotency_key, current_user.id, repo)
