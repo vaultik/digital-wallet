@@ -1,4 +1,4 @@
-# app/models/user.py
+# app/models/base.py
 import uuid
 from datetime import datetime as dt
 
