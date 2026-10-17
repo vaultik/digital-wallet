@@ -3,6 +3,7 @@ from decimal import Decimal
 from typing import AsyncGenerator
 from uuid import UUID
 
+import bcrypt
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -11,7 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_async_session
 from app.main import app
-from app.models import Wallet
+from app.models import User, Wallet
+from app.repositories import (
+    TransactionRepository,
+    WalletRepository,
+)
+from app.services import WalletService
 
 
 # Auth
@@ -186,3 +192,30 @@ async def async_client(override_session: None) -> AsyncGenerator[AsyncClient, No
             base_url='http://test'
     ) as client:
         yield client
+
+
+@pytest_asyncio.fixture
+def wallet_service(db_session: AsyncSession) -> WalletService:
+    """WalletService wired to the test session."""
+    return WalletService(
+        wallet_repo=WalletRepository(db_session),
+        transaction_repo=TransactionRepository(db_session),
+        db=db_session
+    )
+
+
+@pytest_asyncio.fixture
+async def deposit_wallet(db_session: AsyncSession) -> Wallet:
+    """A plain EUR wallet to receive deposits, created without the API."""
+    user = User(
+        username='deposit_user',
+        hashed_password='not-a-real-hash',
+    )
+    db_session.add(user)
+    await db_session.flush()
+
+    wallet = Wallet(user_id=user.id, currency='EUR')
+    db_session.add(wallet)
+    await db_session.flush()
+
+    return wallet

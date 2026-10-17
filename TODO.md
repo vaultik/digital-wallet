@@ -20,6 +20,9 @@
   explicit "login disabled" marker. Needs a data migration.
 - Dependency factories are inconsistent: `WalletService` resolves via bare
   `Depends()`, others via explicit factories.
+- `credit_external_deposit` returns None, so the caller cannot reference the
+  operation it just performed. Return the `group_id` from
+  `_lock_and_apply_double_entry` instead.
 
 ## Before Stage 1 (risk engine)
 - Introduce a `Transfer` entity above ledger entries so risk score,
