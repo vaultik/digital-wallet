@@ -198,14 +198,12 @@ class WalletService:
         if not user_wallet:
             logger.warning('User Wallet not found')
             raise WalletNotFoundError('Wallet not found')
+        if user_wallet.currency != currency:
+            raise InvalidWalletsDataError('The currency does not match')
+
         system_wallet = await self.get_or_create_wallet(
             SYSTEM_USER_ID, currency, is_system=True
         )
-        if not system_wallet:
-            logger.error('System Wallet not found')
-            raise WalletNotFoundError('Wallet not found')
-        if user_wallet.currency != system_wallet.currency:
-            raise InvalidWalletsDataError('The currency does not match')
 
         await self._lock_and_apply_double_entry(
             debit_wallet_id=system_wallet.id,
