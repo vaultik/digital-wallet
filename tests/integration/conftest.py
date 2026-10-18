@@ -6,6 +6,7 @@ from uuid import UUID
 
 import pytest
 import pytest_asyncio
+import stripe
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -241,4 +242,23 @@ async def stripe_client_override(
         yield fake_stripe_client
     app.dependency_overrides[get_stripe_client] = _override
     yield fake_stripe_client
+    app.dependency_overrides.pop(get_stripe_client, None)
+
+
+@pytest_asyncio.fixture
+async def stripe_webhook_override() -> AsyncGenerator[None, None]:
+    """
+    Stripe client that verifies signatures for real.
+
+    Only `construct_event` is wired up — webhook handling never calls the
+    Stripe API, so nothing else needs stubbing.
+    """
+    client = MagicMock()
+    client.construct_event = stripe.Webhook.construct_event
+
+    async def _override():
+        yield client
+
+    app.dependency_overrides[get_stripe_client] = _override
+    yield
     app.dependency_overrides.pop(get_stripe_client, None)

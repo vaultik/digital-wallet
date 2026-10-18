@@ -1,4 +1,7 @@
 # tests/helpers.py
+import hashlib
+import hmac
+import time
 from decimal import Decimal
 from uuid import UUID
 
@@ -33,3 +36,13 @@ async def assert_double_entry(
     assert amount == debit_transaction.amount == credit_transaction.amount
     assert debit_transaction.wallet_id == debit_wallet_id
     assert credit_transaction.wallet_id == credit_wallet_id
+
+
+def stripe_signature_header(payload: bytes, secret: str) -> str:
+    """Build a Stripe-Signature header the SDK will accept."""
+    timestamp = int(time.time())
+    signed = f'{timestamp}.'.encode() + payload
+    signature = hmac.new(
+        secret.encode(), signed, hashlib.sha256
+    ).hexdigest()
+    return f't={timestamp},v1={signature}'
