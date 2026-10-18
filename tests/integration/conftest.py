@@ -1,9 +1,9 @@
 # tests/integration/conftest.py
 from decimal import Decimal
 from typing import AsyncGenerator
+from unittest.mock import MagicMock, AsyncMock
 from uuid import UUID
 
-import bcrypt
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -11,6 +11,7 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_async_session
+from app.core.stripe_client import get_stripe_client
 from app.main import app
 from app.models import User, Wallet
 from app.repositories import (
@@ -175,13 +176,13 @@ async def funded_wallets(
 @pytest_asyncio.fixture(autouse=True)
 async def override_session(
         db_session: AsyncSession
-) -> AsyncGenerator[None, None]:
+) -> AsyncGenerator[AsyncSession, None]:
     """Make the app use the test's session, then restore the app state."""
     async def _override() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
     app.dependency_overrides[get_async_session] = _override
     yield
-    app.dependency_overrides.clear()
+    app.dependency_overrides.pop(get_async_session, None)
 
 
 @pytest_asyncio.fixture
@@ -219,3 +220,25 @@ async def deposit_wallet(db_session: AsyncSession) -> Wallet:
     await db_session.flush()
 
     return wallet
+
+
+@pytest.fixture
+def fake_stripe_client() -> MagicMock:
+    """Stripe client whose checkout session creation is stubbed."""
+    client = MagicMock()
+    session = MagicMock()
+    session.url = 'https://checkout.stripe.com/c/pay/test_session'
+    client.v1.checkout.sessions.create_async = AsyncMock(return_value=session)
+    return client
+
+
+@pytest_asyncio.fixture
+async def stripe_client_override(
+        fake_stripe_client: MagicMock,
+) -> AsyncGenerator[MagicMock, None]:
+    """Replace the real Stripe client for the duration of a test."""
+    async def _override():
+        yield fake_stripe_client
+    app.dependency_overrides[get_stripe_client] = _override
+    yield fake_stripe_client
+    app.dependency_overrides.pop(get_stripe_client, None)

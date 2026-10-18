@@ -23,6 +23,8 @@
 - `credit_external_deposit` returns None, so the caller cannot reference the
   operation it just performed. Return the `group_id` from
   `_lock_and_apply_double_entry` instead.
+- `POST /deposit` returns 201 but creates no resource in this API — the
+  Checkout Session lives on Stripe's side. 200 would be more accurate.
 
 ## Before Stage 1 (risk engine)
 - Introduce a `Transfer` entity above ledger entries so risk score,
