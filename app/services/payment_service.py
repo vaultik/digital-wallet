@@ -58,6 +58,11 @@ class PaymentService:
         currency = await self.currency_repo.get_by_code(data.currency)
         if not currency or not currency.is_active or not currency.is_fiat:
             raise InvalidPaymentDataError('The currency does not match')
+        if data.amount.as_tuple().exponent < -currency.decimals:
+            raise InvalidPaymentDataError(
+                f'{currency.code} supports at most {currency.decimals} '
+                f'decimal places'
+            )
         wallet = await self.wallet_service.get_or_create_wallet(
             user_id=user_id, currency=data.currency
         )
