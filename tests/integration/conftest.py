@@ -8,9 +8,15 @@ import pytest
 import pytest_asyncio
 import stripe
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import update
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text, update
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine
+)
 
+from app.core.config import settings
+from app.core.constants import SYSTEM_USER_ID
 from app.core.db import get_async_session
 from app.core.stripe_client import get_stripe_client
 from app.main import app
@@ -262,3 +268,32 @@ async def stripe_webhook_override() -> AsyncGenerator[None, None]:
     app.dependency_overrides[get_stripe_client] = _override
     yield
     app.dependency_overrides.pop(get_stripe_client, None)
+
+
+@pytest_asyncio.fixture
+async def committing_sessionmaker() -> AsyncGenerator[async_sessionmaker, None]:
+    """
+    Session factory with real connections and real commits.
+
+    Concurrency tests need separate transactions that can see each other's
+    committed work, which the rollback-isolated session cannot provide.
+    """
+    engine = create_async_engine(settings.test_database_url, pool_size=5)
+    yield async_sessionmaker(engine, expire_on_commit=False)
+
+    async with engine.begin() as conn:
+        await conn.execute(text(
+            'TRUNCATE "transaction", "wallet", "user", '
+            'idempotency_records, webhook_idempotency_records '
+            'RESTART IDENTITY CASCADE'
+        ))
+        await conn.execute(
+            text(
+                'INSERT INTO "user" '
+                '(id, username, is_system_user, is_active, is_superuser, '
+                'hashed_password) '
+                'VALUES (:id, \'system\', true, false, false, \'!\')'
+            ),
+            {'id': str(SYSTEM_USER_ID)},
+        )
+    await engine.dispose()
