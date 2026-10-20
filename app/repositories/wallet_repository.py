@@ -58,12 +58,13 @@ class WalletRepository:
         return wallets, total
 
     async def create(
-            self, user_id: UUID, currency: str
+            self, user_id: UUID, currency: str, is_system: bool = False
     ) -> Wallet:
         """Persist a new wallet with zero balance. Flush but do not commit."""
         payload = {
             'user_id': user_id,
-            'currency': currency
+            'currency': currency,
+            'is_system': is_system
         }
         wallet = Wallet(**payload)
         self._db.add(wallet)

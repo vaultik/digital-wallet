@@ -1,17 +1,31 @@
 # tests/integration/conftest.py
 from decimal import Decimal
 from typing import AsyncGenerator
+from unittest.mock import MagicMock, AsyncMock
 from uuid import UUID
 
 import pytest
 import pytest_asyncio
+import stripe
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import update
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text, update
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine
+)
 
+from app.core.config import settings
+from app.core.constants import SYSTEM_USER_ID
 from app.core.db import get_async_session
+from app.core.stripe_client import get_stripe_client
 from app.main import app
-from app.models import Wallet
+from app.models import User, Wallet
+from app.repositories import (
+    TransactionRepository,
+    WalletRepository,
+)
+from app.services import WalletService
 
 
 # Auth
@@ -169,13 +183,13 @@ async def funded_wallets(
 @pytest_asyncio.fixture(autouse=True)
 async def override_session(
         db_session: AsyncSession
-) -> AsyncGenerator[None, None]:
+) -> AsyncGenerator[AsyncSession, None]:
     """Make the app use the test's session, then restore the app state."""
     async def _override() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
     app.dependency_overrides[get_async_session] = _override
     yield
-    app.dependency_overrides.clear()
+    app.dependency_overrides.pop(get_async_session, None)
 
 
 @pytest_asyncio.fixture
@@ -186,3 +200,100 @@ async def async_client(override_session: None) -> AsyncGenerator[AsyncClient, No
             base_url='http://test'
     ) as client:
         yield client
+
+
+@pytest_asyncio.fixture
+def wallet_service(db_session: AsyncSession) -> WalletService:
+    """WalletService wired to the test session."""
+    return WalletService(
+        wallet_repo=WalletRepository(db_session),
+        transaction_repo=TransactionRepository(db_session),
+        db=db_session
+    )
+
+
+@pytest_asyncio.fixture
+async def deposit_wallet(db_session: AsyncSession) -> Wallet:
+    """A plain EUR wallet to receive deposits, created without the API."""
+    user = User(
+        username='deposit_user',
+        hashed_password='not-a-real-hash',
+    )
+    db_session.add(user)
+    await db_session.flush()
+
+    wallet = Wallet(user_id=user.id, currency='EUR')
+    db_session.add(wallet)
+    await db_session.flush()
+
+    return wallet
+
+
+@pytest.fixture
+def fake_stripe_client() -> MagicMock:
+    """Stripe client whose checkout session creation is stubbed."""
+    client = MagicMock()
+    session = MagicMock()
+    session.url = 'https://checkout.stripe.com/c/pay/test_session'
+    client.v1.checkout.sessions.create_async = AsyncMock(return_value=session)
+    return client
+
+
+@pytest_asyncio.fixture
+async def stripe_client_override(
+        fake_stripe_client: MagicMock,
+) -> AsyncGenerator[MagicMock, None]:
+    """Replace the real Stripe client for the duration of a test."""
+    async def _override():
+        yield fake_stripe_client
+    app.dependency_overrides[get_stripe_client] = _override
+    yield fake_stripe_client
+    app.dependency_overrides.pop(get_stripe_client, None)
+
+
+@pytest_asyncio.fixture
+async def stripe_webhook_override() -> AsyncGenerator[None, None]:
+    """
+    Stripe client that verifies signatures for real.
+
+    Only `construct_event` is wired up — webhook handling never calls the
+    Stripe API, so nothing else needs stubbing.
+    """
+    client = MagicMock()
+    client.construct_event = stripe.Webhook.construct_event
+
+    async def _override():
+        yield client
+
+    app.dependency_overrides[get_stripe_client] = _override
+    yield
+    app.dependency_overrides.pop(get_stripe_client, None)
+
+
+@pytest_asyncio.fixture
+async def committing_sessionmaker() -> AsyncGenerator[async_sessionmaker, None]:
+    """
+    Session factory with real connections and real commits.
+
+    Concurrency tests need separate transactions that can see each other's
+    committed work, which the rollback-isolated session cannot provide.
+    """
+    engine = create_async_engine(settings.test_database_url, pool_size=5)
+    yield async_sessionmaker(engine, expire_on_commit=False)
+
+    async with engine.begin() as conn:
+        await conn.execute(text(
+            'TRUNCATE "transaction", "wallet", "user", '
+            'idempotency_records, webhook_idempotency_records '
+            'RESTART IDENTITY CASCADE'
+        ))
+        await conn.execute(
+            text(
+                'INSERT INTO "user" '
+                '(id, username, is_system_user, is_active, is_superuser, '
+                'hashed_password) '
+                'VALUES (:id, \'system\', true, false, false, \'!\')'
+            ),
+            {'id': str(SYSTEM_USER_ID)},
+        )
+    await engine.dispose()

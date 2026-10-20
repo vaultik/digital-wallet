@@ -1,15 +1,30 @@
 # app/api/dependencies.py
-from fastapi import Depends, Request
-from fastapi.security import OAuth2PasswordBearer
+from uuid import UUID
 
+import stripe
+from fastapi import Depends, Header, Request
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.db import get_async_session
 from app.core.exceptions import UserNotFoundError
+from app.core.idempotency_guard import IdempotencyGuard
 from app.core.security import decode_token
+from app.core.stripe_client import get_stripe_client
 from app.models import User
 from app.repositories import (
+    CurrencyRepository,
+    IdempotencyRepository,
     TokenRepository,
+    TransactionRepository,
     UserRepository,
+    WebhookIdempotencyRepository,
 )
-from app.services.auth_service import AuthService
+from app.services import (
+    AuthService,
+    PaymentService,
+    WalletService
+)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl='/api/v1/auth/login')
 
@@ -35,3 +50,33 @@ async def get_auth_service(
         token_repo=token_repo,
         user_repo=user_repo
     )
+
+
+async def get_payment_service(
+        currency_repo: CurrencyRepository = Depends(),
+        stripe_client: stripe.StripeClient = Depends(get_stripe_client),
+        transaction_repo: TransactionRepository = Depends(),
+        wallet_service: WalletService = Depends(),
+        webhook_idempotency_repo: WebhookIdempotencyRepository = Depends(),
+        db: AsyncSession = Depends(get_async_session),
+) -> PaymentService:
+    """
+    Dependency factory for PaymentService with injected repositories and Stripe client.
+    """
+    return PaymentService(
+        currency_repo=currency_repo,
+        stripe_client=stripe_client,
+        transaction_repo=transaction_repo,
+        wallet_service=wallet_service,
+        webhook_idempotency_repo=webhook_idempotency_repo,
+        db=db,
+    )
+
+
+async def get_idempotency_guard(
+        idempotency_key: UUID = Header(..., alias='Idempotency-Key'),
+        current_user: User = Depends(get_current_user),
+        repo: IdempotencyRepository = Depends(),
+) -> IdempotencyGuard:
+    """Build a guard bound to this request's key and user."""
+    return IdempotencyGuard(idempotency_key, current_user.id, repo)

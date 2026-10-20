@@ -9,7 +9,6 @@ from app.core.exceptions import (
     InvalidCredentialsError,
     InvalidTokenError,
     UserAlreadyExistsError,
-    UserNotFoundError
 )
 from app.core.security import (
     create_access_token,
@@ -102,7 +101,7 @@ class AuthService:
         """
         user = await self._user_repo.get_by_username(data.username)
 
-        if user is None:
+        if user is None or not user.is_active:
             raise InvalidCredentialsError('Invalid username or password')
         if not verify_password(data.password, user.hashed_password):
             raise InvalidCredentialsError('Invalid username or password')
@@ -126,6 +125,11 @@ class AuthService:
             data.sid
         )
         if refresh_token != stored_token:
+            raise InvalidTokenError('Please auth again...')
+
+        user = await self._user_repo.get_by_id(data.sub)
+        if user is None or not user.is_active or user.is_system_user:
+            await self._token_repo.delete_refresh_token(data.sub, data.sid)
             raise InvalidTokenError('Please auth again...')
 
         # Rotate: delete old token, issue new pair with same session_id

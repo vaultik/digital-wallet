@@ -1,16 +1,20 @@
 # app/api/v1/wallet_api.py
 from uuid import UUID
 
-from fastapi import (
-    APIRouter, Depends, Header,
-)
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.dependencies import (
+    get_current_user,
+    get_idempotency_guard,
+)
+from app.core.db import get_async_session
+from app.core.idempotency_guard import IdempotencyGuard
 from app.models import User
-from app.api.dependencies import get_current_user
 from app.schemas.wallet_schemas import (
-    WalletCreate,
     TransferCreate,
     TransferResponse,
+    WalletCreate,
     WalletListResponse,
     WalletResponse,
 )
@@ -83,12 +87,20 @@ async def transfer(
         data: TransferCreate,
         current_user: User = Depends(get_current_user),
         service: WalletService = Depends(),
-        idempotency_key: UUID = Header(..., alias='Idempotency-Key')
+        guard: IdempotencyGuard = Depends(get_idempotency_guard),
+        db: AsyncSession = Depends(get_async_session),
 ) -> TransferResponse:
     """
     Execute an atomic P2P transfer between two wallets of the same currency.
     """
-    return await service.transfer(
+    stored, is_new = await guard.claim(data)
+    if not is_new:
+        return stored
+
+    result = await service.transfer(
         current_user_id=current_user.id,
         data=data
     )
+    await guard.save(result)
+    await db.commit()
+    return result

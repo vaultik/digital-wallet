@@ -19,3 +19,15 @@ class WalletNotFoundError(Exception):
 
 class InvalidWalletsDataError(Exception):
     """Raised when wallet's data is incorrect."""
+
+class InvalidPaymentDataError(Exception):
+    """Raised when payment's data is incorrect."""
+
+class PaymentProviderError(Exception):
+    """Raised when Stripe API is unavailable or returns an unexpected error."""
+
+class InvalidWebhookSignatureError(Exception):
+    """Raised when webhook signature invalid."""
+
+class InvalidRequestHashError(Exception):
+    """Raised when Idempotency request hash invalid."""

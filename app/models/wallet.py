@@ -34,6 +34,9 @@ class Wallet(IdTimeMixin, Base):
         default=Decimal('0'),
         server_default='0'  # dual default: python side and DB side guard
     )
+    is_system: Mapped[bool] = mapped_column(
+        Boolean, default=False
+    )
 
     user: Mapped['User'] = relationship(
         back_populates='wallets',
@@ -55,7 +58,7 @@ class Wallet(IdTimeMixin, Base):
             name='uq_currency_user'
         ),
         CheckConstraint(
-            'balance >= 0',
+            'is_system OR balance >= 0',
             name='check_positive_balance'
         ),
     )

@@ -1,9 +1,20 @@
 # tests/integration/test_wallet_api.py
+from decimal import Decimal
 from http import HTTPStatus
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.constants import TransactionType
+from app.models import (
+    IdempotencyRecord,
+    Transaction,
+    Wallet,
+)
+from tests.helpers import assert_double_entry
 
 NONEXISTENT_WALLET_ID = '00000000-0000-0000-0000-000000000000'
 
@@ -92,7 +103,8 @@ async def test_get_wallet_unauthorized(async_client: AsyncClient):
 
 # POST /wallets/transfer
 async def test_transfer_success(
-        funded_wallets: tuple[AsyncClient, str, AsyncClient, str]
+        db_session: AsyncSession,
+        funded_wallets: tuple[AsyncClient, str, AsyncClient, str],
 ):
     """Successful P2P transfer returns 200 and updated sender balance."""
     client1, wallet_id1, client2, wallet_id2 = funded_wallets
@@ -106,7 +118,17 @@ async def test_transfer_success(
         headers={'Idempotency-Key': str(uuid4())}
     )
     assert response.status_code == HTTPStatus.OK
-    assert response.json()['sender_balance'] == '900.000000000000000000'
+    assert Decimal(response.json()['sender_balance']) == Decimal('900')
+    await assert_double_entry(
+        session=db_session,
+        group_id=UUID(response.json()['group_id']),
+        debit_wallet_id=UUID(wallet_id1),
+        credit_wallet_id=UUID(wallet_id2),
+        amount=Decimal('100.00'),
+        transaction_type=TransactionType.LOCAL,
+    )
+    receiver = await db_session.get(Wallet, UUID(wallet_id2))
+    assert receiver.balance == Decimal('100.00')
 
 
 async def test_transfer_insufficient_funds(
@@ -192,3 +214,85 @@ async def test_transfer_unauthorized(async_client: AsyncClient):
         headers={'Idempotency-Key': str(uuid4())}
     )
     assert response.status_code == HTTPStatus.UNAUTHORIZED
+
+
+async def test_transfer_idempotent(
+        db_session: AsyncSession,
+        funded_wallets: tuple[AsyncClient, str, AsyncClient, str],
+):
+    """
+    Repeating a transfer with the same key replays the stored response
+    without moving money twice.
+    """
+    client1, wallet_id1, client2, wallet_id2 = funded_wallets
+    key = str(uuid4())
+    payload = {
+        'sender_wallet_id': wallet_id1,
+        'receiver_wallet_id': wallet_id2,
+        'amount': '100.00',
+    }
+
+    first = await client1.post(
+        '/api/v1/wallets/transfer',
+        json=payload,
+        headers={'Idempotency-Key': key},
+    )
+    second = await client1.post(
+        '/api/v1/wallets/transfer',
+        json=payload,
+        headers={'Idempotency-Key': key},
+    )
+
+    assert first.status_code == HTTPStatus.OK
+    assert second.status_code == HTTPStatus.OK
+    assert first.json() == second.json()
+
+    db_session.expire_all()
+
+    records = (
+        await db_session.execute(select(IdempotencyRecord))
+    ).scalars().all()
+    assert len(records) == 1
+
+    entries = (
+        await db_session.execute(select(Transaction))
+    ).scalars().all()
+    assert len(entries) == 2
+
+    wallet1 = await db_session.get(Wallet, UUID(wallet_id1))
+    wallet2 = await db_session.get(Wallet, UUID(wallet_id2))
+    assert wallet1.balance == Decimal('900.00')
+    assert wallet2.balance == Decimal('100.00')
+
+
+async def test_transfer_same_key_different_payload(
+        db_session: AsyncSession,
+        funded_wallets: tuple[AsyncClient, str, AsyncClient, str],
+):
+    """Reusing a key with different parameters is rejected."""
+    client1, wallet_id1, client2, wallet_id2 = funded_wallets
+    key = str(uuid4())
+    payload1 = {
+        'sender_wallet_id': wallet_id1,
+        'receiver_wallet_id': wallet_id2,
+        'amount': '100.00',
+    }
+    payload2 = {
+        'sender_wallet_id': wallet_id1,
+        'receiver_wallet_id': wallet_id2,
+        'amount': '200.00',
+    }
+
+    first = await client1.post(
+        '/api/v1/wallets/transfer',
+        json=payload1,
+        headers={'Idempotency-Key': key},
+    )
+    second = await client1.post(
+        '/api/v1/wallets/transfer',
+        json=payload2,
+        headers={'Idempotency-Key': key},
+    )
+
+    assert first.status_code == HTTPStatus.OK
+    assert second.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
