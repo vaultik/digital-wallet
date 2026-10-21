@@ -97,7 +97,7 @@ API docs: http://localhost:8000/docs
 
 ## Tests
 
-    pytest
+    poetry run pytest -q
 
 52 tests against a real PostgreSQL instance (no SQLite — the suite relies on
 `SELECT FOR UPDATE`, CHECK constraints and SAVEPOINTs). Each test runs inside
