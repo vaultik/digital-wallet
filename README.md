@@ -82,6 +82,8 @@ a wallet without recording that the webhook was processed.
 
 ## Run
 
+Requires Python 3.12 and Docker.
+
     git clone https://github.com/vaultik/digital_wallet
     cd digital_wallet
     cp .env.example .env          # fill in SECRET and Stripe keys
